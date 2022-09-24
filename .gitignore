@@ -1,0 +1,13 @@
+# Scala
+*.class
+*.log
+
+# sbt
+/.bsp/
+/project/project/
+/project/target/
+/target/
+/*/target/
+
+# IntelliJ IDEA
+/.idea/
