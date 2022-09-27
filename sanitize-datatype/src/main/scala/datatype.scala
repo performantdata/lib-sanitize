@@ -1,5 +1,8 @@
 package com.performantdata.sanitize
 
-package object datatype {
+import com.performantdata.datatype.PersonalName
 
+package object datatype {
+  implicit val personalNameSanitizer: Sanitizer[PersonalName] =
+    (_: PersonalName) => s"${classOf[PersonalName].getSimpleName}(*-*)"
 }

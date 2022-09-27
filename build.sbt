@@ -15,16 +15,9 @@ ThisBuild / libraryDependencies ++= Seq(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(names, sanitize, datatype, sanitizeDatatype)
-
-val names = project
-  .settings(
-    name := "names",
-    idePackagePrefix := Some("com.performantdata.names")
-  )
+  .aggregate(sanitize, datatype, sanitizeDatatype)
 
 val sanitize = project
-  .dependsOn(names)
   .settings(
     name := "sanitize",
     idePackagePrefix := Some("com.performantdata.sanitize")

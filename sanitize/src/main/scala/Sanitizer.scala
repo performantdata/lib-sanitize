@@ -1,22 +1,19 @@
 package com.performantdata.sanitize
 
-import shapeless._
-
-import scala.reflect.runtime.universe
-
 /** A typeclass for types that can be sanitized of their confidential data.
   *
   * @tparam A a type that can be sanitized
   */
-abstract class Sanitizer[A: universe.WeakTypeTag] {
+abstract class Sanitizer[A] {
   /** Return a sanitized representation of the given instance, with confidential data removed. */
   def sanitize(a: A): String
 }
 
 object Sanitizer {
-  private[this] def instance[A](f: A => String): Sanitizer[A] = new Sanitizer[A] {
-    override def sanitize(a: A): String = f(a)
-  }
+  import shapeless._
+  import scala.reflect.runtime.universe
+
+  private[this] def instance[A](f: A => String): Sanitizer[A] = (a: A) => f(a)
 
   implicit val charSanitizer: Sanitizer[Char] = instance[Char](_.toString)
   implicit val byteSanitizer: Sanitizer[Byte] = instance[Byte](_.toString)
@@ -38,20 +35,21 @@ object Sanitizer {
 
   implicit val hnilSanitizer: Sanitizer[HNil] = instance[HNil](_ => "")
 
-  implicit def hlistSanitizer[H, T <: HList](implicit hSan: Lazy[Sanitizer[H]], tSan: Sanitizer[T]): Sanitizer[H :: T] =
-    new Sanitizer[H :: T] {
-      override def sanitize(a: H :: T): String = a match { case h :: t =>
-        val tail = tSan.sanitize(t)
-        val space = if (tail.isEmpty) "" else ", "
-        s"${hSan.value.sanitize(h)}$space$tail"
-      }
-    }
+  implicit def hlistSanitizer[H, T <: HList](implicit
+    hSan: Lazy[Sanitizer[H]],
+    tSan: Sanitizer[T]
+  ): Sanitizer[H :: T] = { case h :: t =>
+    val tail = tSan.sanitize(t)
+    val sep = if (tail.isEmpty) "" else ","
+    s"${hSan.value.sanitize(h)}$sep$tail"
+  }
 
-  implicit def genericSanitizer[A, R](implicit gen: Generic.Aux[A,R], san: Lazy[Sanitizer[R]]): Sanitizer[A] =
-    new Sanitizer[A] {
-      override def sanitize(a: A): String = {
-        val ttag = implicitly[universe.WeakTypeTag[A]]
-        s"${ttag.tpe}(${san.value.sanitize(gen.to(a))})"
-      }
-    }
+  implicit def genericSanitizer[A: universe.WeakTypeTag, R](implicit
+    gen: Generic.Aux[A,R],
+    san: Lazy[Sanitizer[R]]
+  ): Sanitizer[A] = (a: A) => {
+    val ttag = implicitly[universe.WeakTypeTag[A]]
+    val simpleName = ttag.tpe.toString.split('.').last
+    s"$simpleName(${san.value.sanitize(gen.to(a))})"
+  }
 }
