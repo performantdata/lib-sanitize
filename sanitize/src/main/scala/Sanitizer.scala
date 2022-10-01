@@ -9,12 +9,7 @@ abstract class Sanitizer[A] {
   def sanitize(a: A): String
 }
 
-object Sanitizer {
-  import shapeless._
-  import scala.reflect.runtime.universe
-
-  private[this] def instance[A](f: A => String): Sanitizer[A] = (a: A) => f(a)
-
+object Sanitizer extends LowPriorityImports {
   implicit val charSanitizer: Sanitizer[Char] = instance[Char](_.toString)
   implicit val byteSanitizer: Sanitizer[Byte] = instance[Byte](_.toString)
   implicit val intSanitizer: Sanitizer[Int] = instance[Int](_.toString)
@@ -31,21 +26,28 @@ object Sanitizer {
     instance[Either[A, B]](_.map(_.sanitized).swap.map(_.sanitized).swap.toString)
 
   //TODO Create Sanitizers for other common containers: trys, lists, sets, maps,…
+}
 
+sealed trait LowPriorityImports {
+  import shapeless._
+  import scala.reflect.runtime.universe
+
+  protected[this] def instance[A](f: A => String): Sanitizer[A] = (a: A) => f(a)
 
   implicit val hnilSanitizer: Sanitizer[HNil] = instance[HNil](_ => "")
 
   implicit def hlistSanitizer[H, T <: HList](implicit
     hSan: Lazy[Sanitizer[H]],
     tSan: Sanitizer[T]
-  ): Sanitizer[H :: T] = { case h :: t =>
-    val tail = tSan.sanitize(t)
-    val sep = if (tail.isEmpty) "" else ","
-    s"${hSan.value.sanitize(h)}$sep$tail"
+  ): Sanitizer[H :: T] = {
+    case h :: t =>
+      val tail = tSan.sanitize(t)
+      val sep = if (tail.isEmpty) "" else ","
+      s"${hSan.value.sanitize(h)}$sep$tail"
   }
 
   implicit def genericSanitizer[A: universe.WeakTypeTag, R](implicit
-    gen: Generic.Aux[A,R],
+    gen: Generic.Aux[A, R],
     san: Lazy[Sanitizer[R]]
   ): Sanitizer[A] = (a: A) => {
     val ttag = implicitly[universe.WeakTypeTag[A]]
